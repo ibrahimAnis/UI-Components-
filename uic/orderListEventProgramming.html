@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+</head>
+<script>
+function onClick(f)
+{
+alert(f.innerHTML);
+}
+function createSearchLabel()
+{
+alert("CHALA");
+var label=document.createElement("LABEL");
+label.innerHTML="SEARCH";
+}
+createSearchLabel();
+</script>
+<body>
+<div id='label'>
+</div>
+<ul>
+<li id='l1' class='searchListItem' onclick=onClick(this) value='India'>India</li>
+<li id='l2' class='searchListItem' onclick=onClick(this) value='Pakistan'>Pakistan</li>
+<li id='l3' class='searchListItem' onclick=onClick(this) value='China'>China</li>
+<li id='l4' class='searchListItem' onclick=onClick(this) value='Australia'>Australia</li>
+</ul>
+</body>
+<style>
+.searchListItem
+{
+position:relative;
+padding-left:-5px;
+list-style:none;
+cursor:pointer;
+}
+.searchListItem:hover
+{
+background-color:black;
+color:white;
+}
+
+</style>
+</html>

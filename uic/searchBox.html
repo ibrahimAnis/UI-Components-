@@ -1,0 +1,296 @@
+<! doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Search Box</title>
+<script>
+function Department()
+{
+this.code=0;
+this.name="";
+}
+var contextURL='/phase3';
+function $$$(object)
+{
+var httpRequest=new XMLHttpRequest();
+httpRequest.onreadystatechange=function()
+{
+if(httpRequest.readyState==4)
+{
+if(httpRequest.status==200)
+{
+var responseJSON=JSON.parse(httpRequest.responseText);
+if(object.success) object.success(responseJSON);
+}
+else
+{
+if(object.error) object.error(httpRequest.status+":Cannot process request");
+}
+}
+};
+if(object.url)
+{
+if(!object.type) object.type='GET';
+httpRequest.open(object.type.toUpperCase(),object.url,true);
+if(object.type.toUpperCase()=='POST') httpRequest.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+if(object.data) httpRequest.send(object.data); else httpRequest.send();
+}
+}
+function DepartmentService()
+{
+this.getDepartmentsThatStartWith=function(searchQuery,onSuccess,onException,onError)
+{
+$$$(
+{
+url:contextURL+'/getDepartmentsThatStartWith',
+type:'POST',
+data:JSON.stringify(searchQuery),
+success:function(result)
+{
+if(result.success) onSuccess(result.response);
+else onException(result.exception);
+},
+error:function(error){
+onError(error);
+}
+});
+};
+} // departmentService ends here
+function TMSearchGrid(vModel,vContainerID)
+{
+var data=[];
+var model=vModel;
+var containerID=vContainerID;
+var container=document.getElementById(containerID);
+if(container==null)
+{
+//alert("Invalid container ID");
+return;
+}
+var departmentToSearch=null;
+var searchResult=null;
+this.onBoxStateChange=null;
+this.onBoxContentClicked=null;
+this.onBlur=null;
+var THIS=this;
+var label;
+this.createSearchBox=function()
+{
+label=document.createElement("LABEL");
+label.setAttribute("value","Search");
+container.appendChild(label);
+departmentToSearch=document.createElement("input");
+departmentToSearch.setAttribute('placeholder',model.getPlaceholder());
+departmentToSearch.setAttribute('class',model.getSearchInputStyle());
+container.appendChild(departmentToSearch);
+departmentToSearch.addEventListener('keyup',function(event)
+{
+raiseBoxStateChangeEvent();
+});
+container.innerHTML="";
+container.appendChild(departmentToSearch);
+};
+function raiseBoxStateChangeEvent()
+{
+//alert(departmentToSearch.value);
+if(THIS.onBoxStateChange) THIS.onBoxStateChange(departmentToSearch.value);
+}
+this.createSearchList=function(departments)
+{
+//alert("Search List function is called");
+var departmentCount=model.getDepartmentCount();
+//alert(departmentCount);
+departmentToSearch.style.color='black';
+var ul=document.createElement("ul");
+var li;
+for(var i=0;i<departmentCount;i++)
+{
+li=document.createElement("li");
+li.setAttribute('class',model.getSearchListStyle());  // not done
+li.innerHTML=model.getDepartment(i);
+li.onclick=listSelectionHandlerCreator();
+ul.appendChild(li);
+}
+if(!searchResult)
+{
+//alert("search result does not exist");
+var rect=departmentToSearch.getBoundingClientRect();
+var left=rect.left;
+var right=rect.right;
+var top=rect.bottom;
+var width=right-top-50;
+//alert(left+' '+right+' '+top+' '+width);
+searchResult=document.createElement('div');
+searchResult.innerHTML="";
+searchResult.appendChild(ul);
+searchResult.setAttribute('style','background: white;border:1px solid #A6A6A6;padding: 0px;position: absolute; top:'+top+'px;left:'+left+'px;width:'+width+'px');
+container.appendChild(searchResult);
+}
+else
+{
+//alert("searchResult exists");
+//alert(searchResult);
+searchResult.innerHTML="";
+searchResult.appendChild(ul);
+searchResult.style.display='block';
+}
+};
+this.createSearchBox();
+model.setGrid(this);
+departmentToSearch.addEventListener('blur',function(event)
+{
+if(searchResult) 
+{
+setTimeout(function(){
+searchResult.style.display='none';
+},500);
+}
+});
+
+function listSelectionHandlerCreator()
+{
+//alert("listEventCreator");
+return function()
+{
+raiseListSelectionEvent(this);
+};
+}
+function raiseListSelectionEvent(f)
+{
+alert(f.innerHTML+"is selected");
+}
+
+this.setStyleOnFailure=function()
+{
+if(searchResult)
+{
+searchResult.style.display="none";
+searchResult.innerHTML="";
+}
+departmentToSearch.style.color='red';
+}
+
+}  // tmsearch ends here
+
+function SearchModel()
+{
+var grid=null;
+var data=[];
+var count=0;
+this.getDepartmentCount=function()
+{
+return count;
+}
+this.setGrid=function(vGrid)
+{
+grid=vGrid;
+}
+this.getDepartment=function(index)
+{
+return data[index];
+}
+this.getSearchListStyle=function()
+{
+return "searchListItem";
+}
+this.getSearchInputStyle=function()
+{
+return "searchInput";
+}
+this.setDepartments=function(departments)
+{
+count=departments.length;
+data=departments;
+this.updateSearchList();
+}
+this.updateSearchList=function()
+{
+grid.createSearchList();
+}
+this.getPlaceholder=function()
+{
+return "Search for departments";
+}
+this.getDepartments=function()
+{
+return data;
+}
+this.getSearchBoxStyleOnFailure=function()
+{
+return "searchBoxStyleOnFailure";
+}
+}
+
+function SearchController()
+{
+var searchGrid=null;
+var departmentService=null;
+var searchModel=null;
+searchModel=new SearchModel();
+departmentService=new DepartmentService();
+searchGrid=new TMSearchGrid(searchModel,'searchControl');
+searchGrid.onBoxStateChange=function(val)
+{
+var value=val;
+if(!value) return;
+departmentService.getDepartmentsThatStartWith({
+prefix:value,
+},function(departments)
+{
+if(departments.length==0)
+{
+//alert("No records");
+searchGrid.setStyleOnFailure();
+return;
+}
+searchModel.setDepartments(departments);
+},function(exception)
+{
+// not done
+},function(error)
+{
+// not done
+});
+};
+}
+var searchController=null;
+function initializeSearchModule()
+{
+searchController=new SearchController();
+}
+window.addEventListener('load',initializeSearchModule);
+</script>
+<style>
+.searchInput
+{
+background-image: url('images/search_icon.png');
+background-position: 10px 15px;
+background-repeat:no-repeat;
+width:400px;
+font-size:16px;
+padding: 12px 20px 12px 40px;
+border: 1px solid #D6D6D6;
+margin-bottom: 18px;
+}
+.searchListItem
+{
+position:relative;
+padding-left:-5px;
+list-style:none;
+line-height:1.8em;
+font-size:20px;
+cursor:pointer;
+}
+
+.searchListItem:hover
+{
+background-color:black;
+color:white;
+}
+</style>
+</head>
+<body>
+<div id='searchControl'>
+</div>
+</body>
+</html>

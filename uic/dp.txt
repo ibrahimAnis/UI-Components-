@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<script>
+var contextURL='/phase3';
+function $$$(object)
+{
+var httpRequest=new XMLHttpRequest();
+httpRequest.onreadystatechange=function()
+{
+if(httpRequest.readyState==4)
+{
+if(httpRequest.status==200)
+{
+var responseJSON=JSON.parse(httpRequest.responseText);
+if(object.success) object.success(responseJSON);
+}
+else
+{
+if(object.error) object.error(httpRequest.status+": Cannot process request");
+}
+}
+};
+if(object.url)
+{
+if(!object.type) object.type="GET";
+httpRequest.open(object.type.toUpperCase(),object.url,true);
+if(object.type.toUpperCase()=="POST") httpRequest.setRequestHeader("Content-type","application/x-www-forum-urlencoded");
+if(object.data) httpRequest.send(object.data); else httpRequest.send();
+}
+}
+// THE POJO- Department class
+function Department()
+{
+this.code=0;
+this.name="";
+}
+function DepartmentService()
+{
+this.getDepartmentsCount=function(onSuccess,onException,onError)
+{
+$$$(
+{
+url: contextURL+'/getDepartmentsCount',
+type:'GET',
+success:function(result)
+{
+if(result.success) onSuccess(result.response.numberOfRecords);
+else onException(result.exception);
+},
+error:function(error)
+{
+onError(error);
+}
+});
+};
+this.getDepartmentsByPage=function(pageQuery,onSuccess,onException,onError)
+{
+$$$(
+{
+url:contextURL+'/getDepartmentsByPage',
+type:'POST',
+data:JSON.stringify(pageQuery),
+success:function(result)
+{
+if(result.success) onSuccess(result.response);
+else onException(result.exception);
+},
+error:function(error)
+{
+onError(error);
+}
+});
+};
+this.getDepartmentsThatStartWith=function(searchQuery,onSuccess,onException,onError)
+{
+$$$(
+{
+url:contextURL+'/getDepartmentsThatStartWith',
+type:'POST',
+data:JSON.stringify(searchQuery),
+success:function(result)
+{
+if(result.success) onSuccess(result.response);
+else onException(result.exception);
+},
+error:function(error)
+{
+onError(error);
+}
+});
+};
+} // Department Service ends here
+
+function TMSearchGrid(vModel,vContainerID)
+{
+var data=[];
+var model=vModel;
+var containerID=vContainerID;
+var container=document.getElementById(containerID);
+if(container==null)
+{
+alert("Invalid container ID");
+return;
+}
+this.departmentToSearch=null;
+this.searchResult=null;
+this.onBoxStateChange=null;
+this.onBoxContentClicked=null;
+this.onBlur=null;
+var THIS=this;
+this.createSearchBox=function()
+{
+this.departmentToSearch=document.createElement("input");
+this.departmentToSearch.setAttribute('placeholder',model.getPlaceholder());
+this.departmentToSearch.setAttribute('class',model.getSearchInputStyle());
+container.appendChild(this.departmentToSearch);
+this.departmentToSearch.addEventListener('keyup',function(event)
+{
+raiseBoxStateChangeEvent();
+});
+container.innerHTML="";
+container.appendChild(this.departmentToSearch);
+};
+function raiseBoxStateChangeEvent()
+{
+//alert(this.departmentToSearch.value);
+if(THIS.onBoxStateChange) THIS.onBoxStateChange(THIS.departmentToSearch.value);
+}
+this.createSearchList=function(departments)
+{
+//alert("Search List function is called");
+var departmentCount=model.getDepartmentCount();
+//alert(departmentCount);
+this.departmentToSearch.style.color='black';
+var ul=document.createElement("ul");
+var li;
+for(var i=0;i<departmentCount;i++)
+{
+li=document.createElement("li");
+li.setAttribute('class',model.getSearchListStyle());  // not done
+li.innerHTML=model.getDepartment(i);
+li.onclick=listSelectionHandlerCreator();
+ul.appendChild(li);
+}
+if(!THIS.searchResult)
+{
+var rect=this.departmentToSearch.getBoundingClientRect();
+var left=rect.left;
+var right=rect.right;
+var top=rect.bottom;
+var width=right-top-50;
+//alert(left+' '+right+' '+top+' '+width);
+THIS.searchResult=document.createElement('div');
+THIS.searchResult.innerHTML="";
+THIS.searchResult.appendChild(ul);
+THIS.searchResult.setAttribute('style','background: white;border:1px solid #A6A6A6;padding: 0px;position: absolute; top:'+top+'px;left:'+left+'px;width:'+width+'px');
+container.appendChild(THIS.searchResult);
+}
+else
+{
+//alert("searchResult exists");
+//alert(THIS.searchResult);
+THIS.searchResult.innerHTML="";
+THIS.searchResult.appendChild(ul);
+THIS.searchResult.style.display='block';
+}
+};
+this.createSearchBox();
+model.setGrid(this);
+this.departmentToSearch.addEventListener('blur',function(event)
+{
+if(THIS.searchResult) 
+{
+setTimeout(function(){
+THIS.searchResult.style.display='none';
+},100);
+}
+});
+
+function listSelectionHandlerCreator()
+{
+//alert("listEventCreator");
+return function()
+{
+raiseListSelectionEvent(this);
+};
+}
+function raiseListSelectionEvent(f)
+{
+alert(f.innerHTML+"is selected");
+}
+
+}  // tmsearch ends here
+
+function SearchModel()
+{
+var grid=null;
+var data=[];
+var count=0;
+this.getDepartmentCount=function()
+{
+return count;
+}
+this.setGrid=function(vGrid)
+{
+grid=vGrid;
+}
+this.getDepartment=function(index)
+{
+return data[index];
+}
+this.getSearchListStyle=function()
+{
+return "searchListItem";
+}
+this.getSearchInputStyle=function()
+{
+return "searchInput";
+}
+this.setDepartments=function(departments)
+{
+count=departments.length;
+data=departments;
+this.updateSearchList();
+}
+this.updateSearchList=function()
+{
+grid.createSearchList();
+}
+this.getPlaceholder=function()
+{
+return "Search for departments";
+}
+this.getDepartments=function()
+{
+return data;
+}
+this.setContainerStyleOnFailure=function()
+{
+grid.searchResult.style.display='none';
+grid.departmentToSearch.style.color='red';
+grid.searchResult.innerHTML="";
+}
+}
+
+function SearchController()
+{
+var searchGrid=null;
+var departmentService=null;
+var searchModel=null;
+searchModel=new SearchModel();
+departmentService=new DepartmentService();
+searchGrid=new TMSearchGrid(searchModel,'searchControl');
+searchGrid.onBoxStateChange=function(val)
+{
+var value=val;
+if(!value) return;
+departmentService.getDepartmentsThatStartWith({
+prefix:value,
+},function(departments)
+{
+if(departments.length==0)
+{
+//alert("No records");
+searchModel.setContainerStyleOnFailure();
+return;
+}
+searchModel.setDepartments(departments);
+},function(exception)
+{
+// not done
+},function(error)
+{
+// not done
+});
+};
+}
+
+
+// SearchTextField Ends here
+function TMPaginatedGrid(vModel,vContainerID)
+{
+var container;
+var containerID;
+var model=vModel;
+var loading=true;
+var data=[];
+var table;
+var tableBody;
+var navigationBody;
+var tableHeader;
+var selectedRowIndex=-1;
+var THIS=this;
+// event handlers start
+this.onRowSelected=null;
+this.onCellContentClicked=null;
+this.onPageChange=null;
+this.hideLoading=function()
+{
+tableBody.innerHTML="";
+loading=false;
+}
+this.showLoading=function()
+{
+loading=true;
+tableBody.innerHTML="";
+var tr=document.createElement("tr");
+var td=document.createElement("td");
+td.innerHTML=model.getLoadingHTML();
+td.style.textAlign='center';
+tr.appendChild(td);
+tableBody.appendChild(tr);
+if(navigationBody) navigationBody.innerHTML="";
+}
+// event handlers end
+this.update=function()
+{
+if(loading==true) return;
+var rowCount=model.getRowCount();
+var columnCount=model.getColumnCount();
+var i,j;
+tableBody.innerHTML="";
+var tr,td,cellType,textNode,imageNode,image;
+function cellContentClickHandlerCreator(rowNumber,cellNumber)
+{
+return function()
+{
+raiseCellContentClickedEvent(rowNumber,cellNumber);
+};
+}
+
+function rowSelectionHandlerCreator(rowNumber)
+{
+return function()
+{
+raiseRowSelectedEvent(rowNumber);
+};
+}
+for(i=0;i<rowCount;i++)
+{
+tr=document.createElement("tr");
+tr.setAttribute('class',model.getRowStyle(i));
+tr.rowNumber=i;
+for(j=0;j<columnCount;j++)
+{
+td=document.createElement("td");
+td.style.width=model.getColumnWidth(j);
+td.setAttribute('class',model.getCellStyle(i,j));
+cellType=model.getCellType(i,j).toUpperCase();
+if(cellType=='TEXT')
+{
+textNode=document.createTextNode(model.getValueAt(i,j));
+textNode.onclick=cellContentClickHandlerCreator(i,j);
+td.appendChild(textNode);
+} else if(cellType=='IMAGE')
+{
+image=document.createElement('img');
+image.src=model.getValueAt(i,j);
+image.onclick=cellContentClickHandlerCreator(i,j);
+td.appendChild(image);
+} else if(cellType=='HTML')
+{
+td.innerHTML=model.getValueAt(i,j);
+td.onclick=cellContentClickHandlerCreator(i,j);
+}
+tr.appendChild(td);
+}
+tr.style.cursor='pointer';
+tr.onclick=rowSelectionHandlerCreator(i);
+tableBody.appendChild(tr);
+}
+function navigationButtonClickHandlerCreator(onPageChange,vPageNumber)
+{
+////alert(vPageNumber+"in navigaiton");
+return function(){
+if(onPageChange) onPageChange(vPageNumber);
+};
+}
+
+function createNavigationButtons()
+{
+navigationBody.innerHTML="";
+var tr=document.createElement("tr");
+var td=document.createElement("td");
+var currentPageNumber=model.getPageNumber();
+//alert("current page number"+currentPageNumber);
+var navigationButtonCount=model.getNavigationButtonCount();
+//alert("navigationButtonCount"+navigationButtonCount);
+var pageNumberButtonStartFrom=(Math.floor((currentPageNumber-1)/navigationButtonCount)*navigationButtonCount)+1;
+var pageNumberButtonEndAt=pageNumberButtonStartFrom+navigationButtonCount-1;
+if(pageNumberButtonEndAt>model.getNumberOfPages()) pageNumberButtonEndAt=model.getNumberOfPages();
+var textNode;
+var navigationButton;
+if(pageNumberButtonStartFrom>1)
+{
+navigationButton=document.createElement("button");
+navigationButton.innerHTML="Prev";
+if(model.getPageButtonStyle) navigationButton.setAttribute('class',model.getPageButtonStyle());
+navigationButton.onclick=navigationButtonClickHandlerCreator(THIS.onPageChange,pageNumberButtonStartFrom-1);
+td.appendChild(navigationButton);
+}
+var spanForTextNode;
+for(var i=pageNumberButtonStartFrom;i<=pageNumberButtonEndAt;i++)
+{
+if(i==currentPageNumber)
+{
+spanForTextNode=document.createElement("span");
+if(model.getCurrentPageButtonStyle) spanForTextNode.setAttribute('class',model.getCurrentPageButtonStyle());
+textNode=document.createTextNode(i);
+spanForTextNode.append(textNode);
+td.append(spanForTextNode);
+}
+else
+{
+navigationButton=document.createElement("button");
+navigationButton.innerHTML=i;
+navigationButton.onclick=navigationButtonClickHandlerCreator(THIS.onPageChange,i);
+td.appendChild(navigationButton);
+}
+}
+if(pageNumberButtonEndAt<model.getNumberOfPages())
+{
+navigationButton=document.createElement("button");
+navigationButton.innerHTML="Next";
+if(model.getPageButtonStyle) navigationButton.setAttribute('class',model.getPageButtonStyle());
+navigationButton.onclick=navigationButtonClickHandlerCreator(THIS.onPageChange,pageNumberButtonEndAt+1);
+td.appendChild(navigationButton);
+}
+td.style.border='none';
+tr.style.border='none';
+tr.appendChild(td);
+navigationBody.appendChild(tr);
+}
+createNavigationButtons();
+}  // update function ends here
+
+containerID=vContainerID;
+container=document.getElementById(containerID);
+if(container==null)
+{
+//alert("Invalid Container ID");
+//return;
+}
+// creating one time table structure ends here
+var THIS=this;
+function raiseRowSelectedEvent(rowNumber)
+{
+if(rowNumber==selectedRowIndex) return;
+if(selectedRowIndex!=-1) tableBody.rows[selectedRowIndex].setAttribute('class',model.getRowStyle());
+selectedRowIndex=rowNumber;
+tableBody.rows[selectedRowIndex].setAttribute('class',model.getSelectedRowStyle());
+if(THIS.onRowSelected)
+{
+setTimeout(function()
+{
+THIS.onRowSelected(selectedRowIndex);
+},5);
+}
+}
+function raiseCellContentClickedEvent(rowNumber,cellNumber)
+{
+if(THIS.onCellContentClicked)
+{
+setTimeout(function()   // not done
+{
+THIS.onCellContentClicked(selectedRowIndex,cellNumber);
+},100);
+}
+}
+
+function createTable()
+{
+table=document.createElement('table');
+tableHeader=document.createElement('thead');
+var i;
+var tr,th,td;
+var border;
+tr=document.createElement("tr");
+var columnCount=model.getColumnCount();
+border='1px solid'+model.getBorderColor();
+for(i=0;i<columnCount;i++)
+{
+th=document.createElement("th");
+th.innerHTML=model.getColumnTitle(i);
+th.setAttribute('class',model.getHeaderStyle(i));
+th.style.width=model.getColumnWidth(i);
+th.style.border=border;
+tr.appendChild(th);
+}
+tableHeader.appendChild(tr);
+table.appendChild(tableHeader);
+tableBody=document.createElement("tbody");
+tableBody.style.display='block';
+if(model.getBodyHeight) tableBody.style.height=model.getBodyHeight();
+tableBody.style.overflow='scroll';
+THIS.showLoading();
+table.style.display='block';
+table.appendChild(tableBody);
+navigationBody=document.createElement("tbody");  // not done
+table.appendChild(navigationBody);
+table.border=border;
+table.style.borderCollapse='collapse';
+container.innerHTML="";
+container.appendChild(table);
+}// create table ends here
+createTable();
+this.update();
+model.setGrid(this);
+table.setAttribute("tabindex",0);
+table.addEventListener('keydown',function(ev)
+{
+if(ev.keyCode==38)
+{
+if(selectedRowIndex>0)
+{
+raiseRowSelectedEvent(selectedRowIndex-1);
+}
+}
+if(ev.keyCode==40)
+{
+if(selectedRowIndex<model.getRowCount()-1)
+{
+raiseRowSelectedEvent(selectedRowIndex+1);
+}
+}
+if(ev.keyCode==38 || ev.keyCode==40)
+{
+if(ev.preventDefault) ev.preventDefault();
+else if(ev.cancelBubble) ev.cancelBubble=true;
+}
+});
+}
+// TM ENDS HERE
+function DepartmentModel()
+{
+var pageNumber=0;
+var pageSize=0;
+var numberOfRecords=0;
+var page=[];
+var navigationButtonCount=5;
+var grid=null;
+var titles=["S.No","Department","Edit","Delete"];
+var THIS=this;
+this.setDepartmentsCount=function(vNumberOfRecords)
+{
+numberOfRecords=vNumberOfRecords;
+}
+this.setPageSize=function(vPageSize)
+{
+pageSize=vPageSize;
+}
+this.setGrid=function(vGrid)
+{
+grid=vGrid;
+}
+this.getPageSize=function()
+{
+return pageSize;
+}
+this.getNavigationButtonCount=function()
+{
+return navigationButtonCount;
+}
+this.getPageNumber=function()
+{
+return pageNumber;
+}
+this.getNumberOfPages=function()
+{
+return Math.ceil(numberOfRecords/pageSize);
+}
+this.getDepartment=function(index)
+{
+return page[index];
+}
+this.getRowCount=function()
+{
+return page.length;
+}
+this.getColumnCount=function()
+{
+return titles.length;
+}
+this.getColumnTitle=function(columnIndex)
+{
+return titles[columnIndex];
+}
+this.getBodyHeight=function()
+{
+return "300px";
+}
+this.getColumnWidth=function(columnIndex)
+{
+if(columnIndex==0) return "100px";
+if(columnIndex==1) return "300px";
+if(columnIndex==2) return "100px";
+if(columnIndex==3) return "100px";
+}
+this.getHeaderStyle=function()
+{
+return "gridHeader";
+}
+this.getBorderColor=function()
+{
+return '#000000';
+}
+this.getLoadingHTML=function()
+{
+return "<label class='loading'>Loading....</label>";  
+}
+this.getRowStyle=function(rowIndex)
+{
+if(rowIndex%2==0) return 'gridEvenRow';
+else return "gridOddRow";
+}
+this.getCurrentPageButtonStyle=function()
+{
+return "currentPageButton";
+}
+this.getPageButtonStyle=function()
+{
+return "pageButton";
+}
+this.getSelectedRowStyle=function()
+{
+return 'gridSelectedRow';
+}
+this.getCellStyle=function(rowIndx,columnIndex)
+{
+if(columnIndex==0) return "serialNumberColumn";
+if(columnIndex==1) return "departmentColumn";
+if(columnIndex>=2) return "iconColumn";
+}
+this.getCellType=function(rowIndex,columnIndex)
+{
+if(columnIndex==0) return "TEXT";
+if(columnIndex==1) return "TEXT";
+if(columnIndex>=2) return "IMAGE";
+}
+this.getValueAt=function(rowIndex,columnIndex)
+{
+if(columnIndex==0) return (((pageNumber-1)*pageSize)+rowIndex+1);
+if(columnIndex==1) return page[rowIndex].name;
+if(columnIndex==2) return "images/edit_icon.png";
+if(columnIndex==3) return "images/delete_icon.png";
+}
+this.setPage=function(vPageNumber,vDepartments)
+{
+pageNumber=vPageNumber;
+page=vDepartments;
+grid.hideLoading();
+grid.update();
+}
+}
+function DepartmentController()
+{
+var departmentModel=null;
+var departmentGrid=null;
+var departmentService=null;
+departmentModel=new DepartmentModel();
+departmentGrid=new TMPaginatedGrid(departmentModel,'departmentGridView');
+departmentService=new DepartmentService();
+departmentService.getDepartmentsCount(function(numberOfRecords)
+{
+departmentService.getDepartmentsByPage({
+pageNumber:1,
+pageSize:7
+},function(departments)
+{
+departmentModel.setDepartmentsCount(numberOfRecords);
+departmentModel.setPageSize(7);
+departmentModel.setPage(1,departments);
+},function(exception)
+{
+//alert("Exception raised departments by page");
+},function(error)
+{
+//alert("error generated");
+});
+},function(exception)
+{
+//alert("Exception raised in departmentsCount");
+},function(error)
+{
+//alert("error generated");
+});
+departmentGrid.onPageChange=function(vPageNumber)
+{
+//alert(vPageNumber+"on page change");
+departmentGrid.showLoading();
+departmentService.getDepartmentsByPage(
+{
+pageNumber:vPageNumber,
+pageSize:7
+},function(departments)
+{
+departmentModel.setPageSize(7);
+departmentModel.setPage(vPageNumber,departments);
+},function(exception)
+{
+//alert("exception raise on page change");
+},
+function(error)
+{
+//alert("error generated");
+});
+}
+departmentGrid.onRowSelected=function(index)
+{
+alert(JSON.stringify(departmentModel.getDepartment(index)));
+}
+departmentGrid.onCellContentClicked=function(rowIndex,columnIndex)
+{
+if(columnIndex==2) alert("The user wants to edit:->"+JSON.stringify(departmentModel.getDepartment(rowIndex)));
+if(columnIndex==3) alert("The user wants to delete:->"+JSON.stringify(departmentModel.getDepartment(rowIndex)));
+}
+}  // DepartmentController ends here
+var departmentController=null;
+function TMSearchGrid(vModel,vContainerID)
+{
+var data=[];
+var model=vModel;
+var containerID=vContainerID;
+var container=document.getElementById(containerID);
+if(container==null)
+{
+alert("Invalid container ID");
+return;
+}
+this.departmentToSearch=null;
+this.searchResult=null;
+this.onBoxStateChange=null;
+this.onBoxContentClicked=null;
+this.onBlur=null;
+var THIS=this;
+this.createSearchBox=function()
+{
+this.departmentToSearch=document.createElement("input");
+this.departmentToSearch.setAttribute('placeholder',model.getPlaceholder());
+this.departmentToSearch.setAttribute('class',model.getSearchInputStyle());
+container.appendChild(this.departmentToSearch);
+this.departmentToSearch.addEventListener('keyup',function(event)
+{
+raiseBoxStateChangeEvent();
+});
+container.innerHTML="";
+container.appendChild(this.departmentToSearch);
+};
+function raiseBoxStateChangeEvent()
+{
+//alert(this.departmentToSearch.value);
+if(THIS.onBoxStateChange) THIS.onBoxStateChange(THIS.departmentToSearch.value);
+}
+this.createSearchList=function(departments)
+{
+//alert("Search List function is called");
+var departmentCount=model.getDepartmentCount();
+//alert(departmentCount);
+this.departmentToSearch.style.color='black';
+var ul=document.createElement("ul");
+var li;
+for(var i=0;i<departmentCount;i++)
+{
+li=document.createElement("li");
+li.setAttribute('class',model.getSearchListStyle());  // not done
+li.innerHTML=model.getDepartment(i);
+li.onclick=listSelectionHandlerCreator();
+ul.appendChild(li);
+}
+if(!THIS.searchResult)
+{
+var rect=this.departmentToSearch.getBoundingClientRect();
+var left=rect.left;
+var right=rect.right;
+var top=rect.bottom;
+var width=right-top-50;
+//alert(left+' '+right+' '+top+' '+width);
+THIS.searchResult=document.createElement('div');
+THIS.searchResult.innerHTML="";
+THIS.searchResult.appendChild(ul);
+THIS.searchResult.setAttribute('style','background: white;border:1px solid #A6A6A6;padding: 0px;position: absolute; top:'+top+'px;left:'+left+'px;width:'+width+'px');
+container.appendChild(THIS.searchResult);
+}
+else
+{
+//alert("searchResult exists");
+//alert(THIS.searchResult);
+THIS.searchResult.innerHTML="";
+THIS.searchResult.appendChild(ul);
+THIS.searchResult.style.display='block';
+}
+};
+this.createSearchBox();
+model.setGrid(this);
+this.departmentToSearch.addEventListener('blur',function(event)
+{
+if(THIS.searchResult) 
+{
+setTimeout(function(){
+THIS.searchResult.style.display='none';
+},100);
+}
+});
+
+function listSelectionHandlerCreator()
+{
+//alert("listEventCreator");
+return function()
+{
+raiseListSelectionEvent(this);
+};
+}
+function raiseListSelectionEvent(f)
+{
+alert(f.innerHTML+"is selected");
+}
+
+}  // tmsearch ends here
+
+function SearchModel()
+{
+var grid=null;
+var data=[];
+var count=0;
+this.getDepartmentCount=function()
+{
+return count;
+}
+this.setGrid=function(vGrid)
+{
+grid=vGrid;
+}
+this.getDepartment=function(index)
+{
+return data[index];
+}
+this.getSearchListStyle=function()
+{
+return "searchListItem";
+}
+this.getSearchInputStyle=function()
+{
+return "searchInput";
+}
+this.setDepartments=function(departments)
+{
+count=departments.length;
+data=departments;
+this.updateSearchList();
+}
+this.updateSearchList=function()
+{
+grid.createSearchList();
+}
+this.getPlaceholder=function()
+{
+return "Search for departments";
+}
+this.getDepartments=function()
+{
+return data;
+}
+this.setContainerStyleOnFailure=function()
+{
+grid.searchResult.style.display='none';
+grid.departmentToSearch.style.color='red';
+grid.searchResult.innerHTML="";
+}
+}
+
+function SearchController()
+{
+var searchGrid=null;
+var departmentService=null;
+var searchModel=null;
+searchModel=new SearchModel();
+departmentService=new DepartmentService();
+searchGrid=new TMSearchGrid(searchModel,'searchControl');
+searchGrid.onBoxStateChange=function(val)
+{
+var value=val;
+if(!value) return;
+departmentService.getDepartmentsThatStartWith({
+prefix:value,
+},function(departments)
+{
+if(departments.length==0)
+{
+//alert("No records");
+searchModel.setContainerStyleOnFailure();
+return;
+}
+searchModel.setDepartments(departments);
+},function(exception)
+{
+// not done
+},function(error)
+{
+// not done
+});
+};
+}
+var searchController=null;
+var departmentController=null;
+function initializeModules()
+{
+searchController=new SearchController();
+departmentController=new DepartmentController();
+}
+window.addEventListener('load',initializeModules);
+</script>
+<style>
+.loading
+{
+font-family:"Verdana","Times New Roman",Times,serif;
+font-style:normal;
+font-size:24px;
+color:green;
+}
+.gridHeader
+{
+font-family:"Times New Roman",Times,serif;
+font-style:bold;
+font-size:18px;
+}
+.serialNumberColumn
+{
+font-family:"Times New Roman",Times,serif;
+font-style:normal;
+font-size:16px;
+text-align:right;
+}
+.departmentColumn
+{
+font-family:"Times New Roman",Times,serif;
+font-style:normal;
+font-size:16px;
+text-align:left;
+}
+.gridEvenRow
+{
+background-color:#D6D6D6;
+color:black;
+height:40px;
+min-height:40px;
+}
+.gridOddRow
+{
+background-color:white;
+color:black;
+height:40px;
+min-height:40px;
+}
+.gridOddRow
+{
+background-color:white;
+color:black;
+height:40px;
+min-height:40px;
+}
+.currentPageButton
+{
+padding-left:10px;
+padding-right:10px;
+background-color: #269300
+color:white;
+font-size:14pt;
+}
+.pageButton
+{
+margin-left:2px;
+margin-right:2px;
+padding-left:15px;
+padding-right:15px;
+font-size:12pt;
+}
+.gridSelectedRow
+{
+background-color:#2693FF;
+color:#FFFFFF;
+height:40px;
+min-height:40px;
+}
+.iconColumn
+{
+text-align:center;
+}
+
+.searchInput
+{
+background-image: url('images/search_icon.png');
+background-position: 10px 12px;
+background-repeat:no-repeat;
+width:400px;
+font-size:16px;
+padding: 12px 20px 12px 40px;
+border: 1px solid #D6D6D6;
+margin-bottom: 12px;
+}
+.searchListItem
+{
+position:relative;
+padding-left:-5px;
+list-style:none;
+line-height:1.8em;
+font-size:20px;
+cursor:pointer;
+}
+
+.searchListItem:hover
+{
+background-color:black;
+color:white;
+}
+</style>
+<body>
+<div id='searchControl'>
+</div>
+<div id='departmentGridView'></div>
+</body>
+</head>
